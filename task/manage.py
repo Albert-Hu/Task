@@ -22,7 +22,7 @@ def _translate(function, data):
     result = {'succeed': False}
     try:
         new_data = function(data)
-        if new_data:
+        if new_data != None:
             result['succeed'] = True
             result['data'] = new_data
     except Exception as e:
@@ -47,15 +47,15 @@ class TaskManager(object):
     def add(self, name, task):
         assert not self._isbusy, 'Task manager is busy.'
         assert isinstance(task, BaseTask), 'Task is not inherit from BaseTask'
-        self._tasks[name] = {'instance': task, 'translator': {}, 'map': {}}
+        self._tasks[name] = {'instance': task, 'next': {}, 'map': {}}
 
-    def translate(self, _from, _to, translator=_bypass):
+    def connect(self, _from, _to, translator=_bypass):
         assert not self._isbusy, 'Task manager is busy.'
         assert _from in self._tasks, 'Task {} not found.'.format(_from)
         assert _to in self._tasks, 'Task {} not found.'.format(_to)
         assert callable(translator), 'Argument 3 should be a function.'
         task = self._tasks[_from]
-        task['translator'][_to] = translator
+        task['next'][_to] = translator
 
     def map(self, _from, _to, translator=_bypass):
         assert not self._isbusy, 'Task manager is busy.'
@@ -88,9 +88,9 @@ class TaskManager(object):
                 if not status['succeed']:
                     _error_handle(self._error_handle, name, task['instance'], status['error'])
                     continue
-                # Translate to next tasks.
-                for next_task_name in task['translator']:
-                    function = task['translator'][next_task_name]
+                # Go to next tasks.
+                for next_task_name in task['next']:
+                    function = task['next'][next_task_name]
                     translated_status = _translate(function, status['data'])
                     if 'error' in translated_status:
                         _error_handle(self._error_handle, name, task['instance'], translated_status['error'])
