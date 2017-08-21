@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+from collections import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from task.base import BaseTask
 
@@ -22,9 +23,8 @@ def _translate(function, data):
     result = {'succeed': False}
     try:
         new_data = function(data)
-        if new_data != None:
-            result['succeed'] = True
-            result['data'] = new_data
+        result['data'] = new_data
+        result['succeed'] = True
     except Exception as e:
         result['error'] = e
     return result
@@ -45,22 +45,23 @@ class TaskManager(object):
         self._isbusy = False
 
     def add(self, name, task):
+        assert not name in self._tasks, 'Task already exists.'
         assert not self._isbusy, 'Task manager is busy.'
         assert isinstance(task, BaseTask), 'Task is not inherit from BaseTask'
         self._tasks[name] = {'instance': task, 'next': {}, 'map': {}}
 
     def connect(self, _from, _to, translator=_bypass):
         assert not self._isbusy, 'Task manager is busy.'
-        assert _from in self._tasks, 'Task {} not found.'.format(_from)
-        assert _to in self._tasks, 'Task {} not found.'.format(_to)
+        assert _from in self._tasks, 'Task {} is not defined.'.format(_from)
+        assert _to in self._tasks, 'Task {} is not defined.'.format(_to)
         assert callable(translator), 'Argument 3 should be a function.'
         task = self._tasks[_from]
         task['next'][_to] = translator
 
     def map(self, _from, _to, translator=_bypass):
         assert not self._isbusy, 'Task manager is busy.'
-        assert _from in self._tasks, 'Task {} not found.'.format(_from)
-        assert _to in self._tasks, 'Task {} not found.'.format(_to)
+        assert _from in self._tasks, 'Task {} is not defined.'.format(_from)
+        assert _to in self._tasks, 'Task {} is not defined.'.format(_to)
         assert callable(translator), 'Argument 3 should be a function.'
         task = self._tasks[_from]
         task['map'][_to] = translator
@@ -92,10 +93,10 @@ class TaskManager(object):
                 for next_task_name in task['next']:
                     function = task['next'][next_task_name]
                     translated_status = _translate(function, status['data'])
-                    if 'error' in translated_status:
-                        _error_handle(self._error_handle, name, task['instance'], translated_status['error'])
-                        break
                     if not translated_status['succeed']:
+                        _error_handle(self._error_handle, name, task['instance'], translated_status['error'])
+                        continue
+                    if translated_status['data'] == None:
                         continue
                     next_task = self._tasks[next_task_name]
                     worker = threads.submit(_run, next_task['instance'], translated_status['data'])
@@ -104,15 +105,16 @@ class TaskManager(object):
                 for next_task_name in task['map']:
                     function = task['map'][next_task_name]
                     translated_status = _translate(function, status['data'])
-                    if 'error' in translated_status:
-                        _error_handle(self._error_handle, name, task['instance'], translated_status['error'])
-                        break
-                    if not type(translated_status['data']) is list:
-                        _error_handle(self._error_handle, name, task['instance'], BaseException('Translated data is not a list.'))
-                        break
                     if not translated_status['succeed']:
+                        _error_handle(self._error_handle, name, task['instance'], translated_status['error'])
+                        continue
+                    if translated_status['data'] == None:
+                        continue
+                    if not isinstance(translated_status['data'], Iterable):
+                        _error_handle(self._error_handle, name, task['instance'], Exception('Translated data should be iterable.'))
                         continue
                     next_task = self._tasks[next_task_name]
                     for data in translated_status['data']:
                         worker = threads.submit(_run, next_task['instance'], data)
                         self._workers.insert(0, (next_task_name, worker))
+        return True
