@@ -1,6 +1,5 @@
 from task.base import BaseTask
 from task.manage import TaskManager
-from _functools import reduce
 
 work_number = 1000
 
@@ -15,14 +14,17 @@ class Work():
 def error_handle(task_name, task_instance, error):
     print('[ERROR] {}: {}'.format(task_name, str(error)))
 
+def initialize(works):
+    return works
+
 def finish(work):
     work.finish()
 
 def run():
     global work_number
-    works = [Work() for _ in range(0, work_number)]
+    works = [(Work(), ) for _ in range(0, work_number)]
     manager = TaskManager(error_handle)
-    start = BaseTask()
+    start = BaseTask(initialize)
     end = BaseTask(finish)
     manager.add('start', start)
     manager.add('end', end)
@@ -30,7 +32,7 @@ def run():
     manager.schedule('start', works)
     manager.run()
     for work in works:
-        if not work.done():
+        if not work[0].done():
             return False
     return True
 
