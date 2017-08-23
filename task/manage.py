@@ -27,9 +27,9 @@ def _translate(function, data):
             succeed = True
             result = new_data
         else:
-            result['error'] = Exception('Translated data must be type of tuple.')
+            result = Exception('Translated data must be type of tuple.')
     except Exception as e:
-        result['error'] = e
+        result = e
     return succeed, result
 
 def _multiple_translate(function, data):
@@ -58,7 +58,7 @@ def _bypass_multiple(data):
     return data
 
 def _bypass(data):
-    return (data,)
+    return (data,) if data != None else None
 
 def _bypass_error(task_name, task_instance, error):
     pass
