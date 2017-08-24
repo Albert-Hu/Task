@@ -12,9 +12,9 @@ def _run(instance, args):
         result = e
     return succeed, result
 
-def _error_handle(callback, task_name, task_instance, error):
+def _error_handle(callback, _from, _to, error):
     try:
-        callback(task_name, task_instance, error)
+        callback(_from, _to, error)
     except Exception as e:
         print(e)
 
@@ -60,7 +60,7 @@ def _bypass_multiple(data):
 def _bypass(data):
     return (data,) if data != None else None
 
-def _bypass_error(task_name, task_instance, error):
+def _bypass_error(_from, _to, error):
     pass
 
 class TaskManager(object):
@@ -115,14 +115,14 @@ class TaskManager(object):
                 task = self._tasks[name]
                 succeed, task_result = worker.result()
                 if not succeed:
-                    _error_handle(self._error_handle, name, task['instance'], task_result)
+                    _error_handle(self._error_handle, name, name, task_result)
                     continue
                 # Go to next tasks.
                 for next_task_name in task['next']:
                     function = task['next'][next_task_name]
                     succeed, result = _translate(function, task_result)
                     if not succeed:
-                        _error_handle(self._error_handle, name, task['instance'], result)
+                        _error_handle(self._error_handle, name, next_task_name, result)
                         continue
                     if result == None:
                         continue
@@ -134,7 +134,7 @@ class TaskManager(object):
                     function = task['map'][next_task_name]
                     succeed, result = _multiple_translate(function, task_result)
                     if not succeed:
-                        _error_handle(self._error_handle, name, task['instance'], result)
+                        _error_handle(self._error_handle, name, next_task_name, result)
                         continue
                     if result == None:
                         continue
